@@ -1,6 +1,7 @@
 # 本機器人使用說明
 
-使用OCR並在openCV底下，在Python 3.11 並使用 Conda 建構，開發環境為 Mac Mini M4 Pro。
+使用OCR並在openCV底下，在Python 3.11 並使用 Conda 建構，開發環境為 Mac Mini M4 Pro
+注意：目前只有mac可以使用，請將手機更新到ios 18 使用鏡像輸出進行。
 
 ## 安裝方式
 
