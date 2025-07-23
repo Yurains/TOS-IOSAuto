@@ -227,6 +227,21 @@ class MainWindow(QMainWindow):
         
         left_layout.addWidget(self.start_infinite_button)
 
+        # 新增“刪除所有擷取”按鈕
+        self.delete_all_button = QPushButton('刪除所有擷取')
+        self.delete_all_button.clicked.connect(self.delete_all_captures)
+        self.delete_all_button.setStyleSheet("""
+            QPushButton {
+                background-color: #f44336;
+                color: white;
+                padding: 10px;
+                border-radius: 5px;
+                font-size: 14px;
+            }
+        """)
+        
+        left_layout.addWidget(self.delete_all_button)
+
         # 右側面板（預覽和控制）
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
@@ -305,6 +320,26 @@ class MainWindow(QMainWindow):
             self.captures.pop(current_row)
             # 每次修改後保存一次
             self.save_captures_to_json()
+
+    def delete_all_captures(self):
+        """ 刪除所有擷取區域並清空 JSON 文件 """
+        if not self.captures:
+            QMessageBox.information(self, "提示", "目前沒有任何擷取區域")
+            return
+
+        reply = QMessageBox.question(
+            self, '確認', '確定要刪除所有擷取區域嗎？',
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+
+        if reply == QMessageBox.Yes:
+            self.captures.clear()
+            self.capture_list.clear()
+            self.preview_label.clear()
+            self.ocr_result.setText('OCR結果')
+            if os.path.exists(JSON_FILE):
+                os.remove(JSON_FILE)
+            self.status_label.setText("所有擷取區域已刪除")
 
     def set_click_count(self):
         current_row = self.capture_list.currentRow()
