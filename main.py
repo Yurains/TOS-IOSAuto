@@ -42,7 +42,6 @@ class CaptureInfo:
     def to_dict(self):
         """
         將此擷取信息轉成可保存於 JSON 的字典格式。
-
         使用 QBuffer 介面將 QPixmap 轉為 base64，避免
         QPixmap.save() 直接對 BytesIO 造成 TypeError。
         """
@@ -82,7 +81,7 @@ class CaptureInfo:
             qpixmap,
             data["ocr_text"]
         )
-        cap.click_count = data["click_count"]
+        cap.click_count = data.get("click_count", 1)
         return cap
 
 class ScreenCaptureWidget(QWidget):
@@ -224,13 +223,12 @@ class MainWindow(QMainWindow):
                 font-size: 14px;
             }
         """)
-        
         left_layout.addWidget(self.start_infinite_button)
 
-        # 新增“刪除所有擷取”按鈕
-        self.delete_all_button = QPushButton('刪除所有擷取')
-        self.delete_all_button.clicked.connect(self.delete_all_captures)
-        self.delete_all_button.setStyleSheet("""
+        # ✅ 新增「一鍵刪除全部」按鈕
+        self.clear_all_button = QPushButton('一鍵刪除全部')
+        self.clear_all_button.clicked.connect(self.clear_all_captures)
+        self.clear_all_button.setStyleSheet("""
             QPushButton {
                 background-color: #f44336;
                 color: white;
@@ -238,9 +236,11 @@ class MainWindow(QMainWindow):
                 border-radius: 5px;
                 font-size: 14px;
             }
+            QPushButton:hover {
+                background-color: #d32f2f;
+            }
         """)
-        
-        left_layout.addWidget(self.delete_all_button)
+        left_layout.addWidget(self.clear_all_button)
 
         # 右側面板（預覽和控制）
         right_panel = QWidget()
@@ -320,26 +320,6 @@ class MainWindow(QMainWindow):
             self.captures.pop(current_row)
             # 每次修改後保存一次
             self.save_captures_to_json()
-
-    def delete_all_captures(self):
-        """ 刪除所有擷取區域並清空 JSON 文件 """
-        if not self.captures:
-            QMessageBox.information(self, "提示", "目前沒有任何擷取區域")
-            return
-
-        reply = QMessageBox.question(
-            self, '確認', '確定要刪除所有擷取區域嗎？',
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
-        )
-
-        if reply == QMessageBox.Yes:
-            self.captures.clear()
-            self.capture_list.clear()
-            self.preview_label.clear()
-            self.ocr_result.setText('OCR結果')
-            if os.path.exists(JSON_FILE):
-                os.remove(JSON_FILE)
-            self.status_label.setText("所有擷取區域已刪除")
 
     def set_click_count(self):
         current_row = self.capture_list.currentRow()
@@ -598,6 +578,55 @@ class MainWindow(QMainWindow):
 
             except Exception as e:
                 QMessageBox.warning(self, "讀取錯誤", f"讀取 {JSON_FILE} 失敗: {e}")
+
+    # ✅ 新增：一鍵刪除全部
+    def clear_all_captures(self):
+        """
+        一鍵刪除所有的內容：
+        1) 停止持續執行（若在執行）
+        2) 清空 captures 與清單
+        3) 清空右側預覽與 OCR 顯示
+        4) 刪除或重建 JSON 檔
+        """
+        reply = QMessageBox.question(
+            self,
+            "確認刪除",
+            "此操作將刪除所有擷取與紀錄，且無法復原。\n確定要刪除嗎？",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if reply != QMessageBox.Yes:
+            return
+
+        # 1) 停止持續執行
+        self.stop_infinite_execution()
+
+        # 2) 清空資料
+        self.captures.clear()
+        self.capture_list.clear()
+
+        # 3) 清空右側顯示
+        self.preview_label.clear()
+        self.preview_label.setText("")  # 清除占位
+        self.ocr_result.setText("OCR結果")
+        self.status_label.setText("已清空所有擷取內容。")
+
+        # 4) 刪除或重建 JSON
+        try:
+            if os.path.exists(JSON_FILE):
+                os.remove(JSON_FILE)
+        except Exception as e:
+            # 若刪除失敗，至少寫入為空陣列
+            with open(JSON_FILE, 'w', encoding='utf-8') as f:
+                json.dump([], f, ensure_ascii=False, indent=2)
+            QMessageBox.warning(self, "檔案處理", f"刪除 {JSON_FILE} 失敗，已改為重置為空內容：{e}")
+            return
+
+        # 重新寫入空陣列（可有可無，保證檔案存在且為空）
+        with open(JSON_FILE, 'w', encoding='utf-8') as f:
+            json.dump([], f, ensure_ascii=False, indent=2)
+
+        QMessageBox.information(self, "完成", "已刪除全部內容並重置。")
 
     def closeEvent(self, event):
         """ 在關閉視窗時確保執行緒停止，並保存資料 """
